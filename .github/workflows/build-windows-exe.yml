@@ -22,10 +22,11 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install web dependencies & build offline bundle
-        run: |
-          npm install
-          npm run build
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Build offline bundle
+        run: npm run build
 
       - name: Install Electron packager & build portable .exe
         run: node desktop/build-exe.mjs
