@@ -1,0 +1,39 @@
+name: Build Standalone Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install web dependencies & build offline bundle
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Electron packager & build portable .exe
+        run: node desktop/build-exe.mjs
+
+      - name: Upload standalone Windows .exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RouteLedger-ADAMA-Drivers-Portable-EXE
+          path: desktop/release/*.exe
+          if-no-files-found: error

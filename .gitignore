@@ -1,0 +1,13 @@
+node_modules/
+release/
+dist/
+dev-dist/
+desktop/node_modules/
+desktop/dist/
+desktop/build/
+desktop/release/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example

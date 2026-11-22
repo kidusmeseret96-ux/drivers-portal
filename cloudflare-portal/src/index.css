@@ -1,0 +1,110 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --font-display: 'Plus Jakarta Sans', 'Noto Sans Ethiopic', 'Ebrima', 'Nyala', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-sans: 'DM Sans', 'Noto Sans Ethiopic', 'Ebrima', 'Nyala', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rich Transport Dispatch Canvas Background (replaces flat white background) */
+.ada-canvas-bg {
+  background-color: #DCE6F2;
+  background-image:
+    radial-gradient(at 14% 8%, rgba(3, 78, 162, 0.11) 0px, transparent 48%),
+    radial-gradient(at 88% 82%, rgba(7, 137, 48, 0.08) 0px, transparent 52%),
+    linear-gradient(to right, rgba(11, 44, 93, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(11, 44, 93, 0.045) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+}
+
+html.dark .ada-canvas-bg {
+  background-color: #060B14;
+  background-image:
+    radial-gradient(at 15% 8%, rgba(3, 78, 162, 0.22) 0px, transparent 48%),
+    radial-gradient(at 85% 88%, rgba(180, 83, 9, 0.12) 0px, transparent 52%),
+    linear-gradient(to right, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+}
+
+/* Tactile Dispatch Surface Card (subtle cool-slate depth instead of stark paper white) */
+.ada-surface {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 100%);
+  border-color: rgba(148, 163, 184, 0.45);
+  box-shadow: 0 1px 2px rgba(11, 44, 93, 0.05), 0 4px 12px -4px rgba(15, 23, 42, 0.05);
+}
+
+html.dark .ada-surface {
+  background: linear-gradient(180deg, #111827 0%, #0D1424 100%);
+  border-color: rgba(51, 65, 85, 0.75);
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.45);
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  .ada-canvas-bg {
+    background: #ffffff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-card {
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  body.ada-modal-open main,
+  body.ada-modal-open aside,
+  body.ada-modal-open header {
+    display: none !important;
+  }
+  body.ada-modal-open .modal-print-backdrop {
+    position: static !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  body.ada-modal-open .modal-print-dialog {
+    max-height: none !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  body.ada-modal-open .modal-print-scroll {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}

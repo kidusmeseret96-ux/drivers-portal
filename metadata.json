@@ -1,0 +1,6 @@
+{
+  "name": "RouteLedger — Drivers Association Registry",
+  "description": "Offline-first desktop registry and physical-to-digital records system for drivers associations: member dossiers, fleet vehicles, dues ledger, inspections, incidents, and document digitization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

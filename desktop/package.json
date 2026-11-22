@@ -1,0 +1,37 @@
+{
+  "name": "routeledger-adama-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build:exe": "node build-exe.mjs",
+    "pack:win": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.adama.drivers.routeledger",
+    "productName": "Adama Heavy Truck Drivers Edir",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "dist/**/*",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "RouteLedger-ADAMA-Drivers-Portable.exe"
+    }
+  }
+}
