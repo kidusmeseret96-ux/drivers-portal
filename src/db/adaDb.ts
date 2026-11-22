@@ -394,10 +394,28 @@ export async function resetAdaToDemo(): Promise<LoadedAdaState> {
 }
 
 export async function importAdaBackup(backup: AdaFullBackup): Promise<LoadedAdaState> {
+  const existingSettingsRows = await getAllAda<AdaSettings>('settings');
+  const existingPrimarySettings = existingSettingsRows.find((s) => s.id === 'primary');
+
+  const shouldKeepExistingSettings =
+    backup.preserveSettings === true ||
+    !backup.settings ||
+    typeof backup.settings !== 'object' ||
+    Object.keys(backup.settings).length === 0;
+
+  const settingsToStore: AdaSettings = shouldKeepExistingSettings
+    ? (existingPrimarySettings ?? DEFAULT_ADA_SETTINGS)
+    : {
+        ...DEFAULT_ADA_SETTINGS,
+        ...backup.settings,
+        id: 'primary',
+      };
+
   const db = await openDatabase();
-  const tx = db.transaction(ALL_STORES, 'readwrite');
+  const tx = db.transaction([...ALL_STORES, SYNC_QUEUE_STORE], 'readwrite');
   for (const s of ALL_STORES) tx.objectStore(s).clear();
-  tx.objectStore('settings').put({...backup.settings, id: 'primary'});
+  tx.objectStore(SYNC_QUEUE_STORE).clear();
+  tx.objectStore('settings').put({...settingsToStore, id: 'primary'});
   for (const m of backup.members ?? []) tx.objectStore('members').put(m);
   for (const p of backup.payments ?? []) tx.objectStore('payments').put(p);
   for (const l of backup.penalties ?? []) tx.objectStore('penalties').put(l);

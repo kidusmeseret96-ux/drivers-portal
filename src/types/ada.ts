@@ -287,7 +287,8 @@ export interface AdaFullBackup {
   schemaVersion: number;
   exportedAt: string;
   app: 'ADA-System';
-  settings: AdaSettings;
+  preserveSettings?: boolean;
+  settings?: AdaSettings;
   members: AdaMember[];
   payments: AdaPayment[];
   penalties: AdaPenalty[];

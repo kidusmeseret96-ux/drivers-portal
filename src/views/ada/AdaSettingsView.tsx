@@ -21,11 +21,13 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
+import {BatchIdPrintSection} from '../../components/BatchIdPrintSection';
 import {ModalShell} from '../../components/ModalShell';
 import {getDefaultFullAccessRoles, isSupabaseSyncConfigured} from '../../db/supabaseSync';
 import {LANGUAGE_OPTIONS, translate, translateRole} from '../../i18n/translations';
 import {
   type AdaFullBackup,
+  type AdaMember,
   type AdaSettings,
   type CategoryConfig,
   DEFAULT_MEMBER_ROLES,
@@ -41,6 +43,7 @@ import {ASSOCIATION_LOGO_PATH} from '../../utils/idCardExport';
 
 interface AdaSettingsViewProps {
   settings: AdaSettings;
+  members?: AdaMember[];
   onSaveSettings: (next: AdaSettings) => Promise<void>;
   onBuildBackup: () => AdaFullBackup;
   onRestoreBackup: (backup: AdaFullBackup) => Promise<void>;
@@ -253,6 +256,7 @@ function CategoryManager({
 
 export const AdaSettingsView: React.FC<AdaSettingsViewProps> = ({
   settings,
+  members = [],
   onSaveSettings,
   onBuildBackup,
   onRestoreBackup,
@@ -412,6 +416,7 @@ export const AdaSettingsView: React.FC<AdaSettingsViewProps> = ({
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   return (
@@ -1197,6 +1202,13 @@ export const AdaSettingsView: React.FC<AdaSettingsViewProps> = ({
           </button>
         </div>
       </form>
+
+      {/* Batch Print IDs (5-per-sheet Front Left | Back Right, Horizontally Inverted) */}
+      <BatchIdPrintSection
+        members={members}
+        settings={form}
+        onNotice={showNotice}
+      />
 
       {/* Demo Data & Portable Backup Controls */}
       <section className="ada-surface rounded-xl p-5 space-y-4">

@@ -913,6 +913,7 @@ export default function App() {
                 {activeView === 'settings' && (
                   <AdaSettingsView
                     settings={settings}
+                    members={members}
                     onSaveSettings={handleSaveSettings}
                     onBuildBackup={handleBuildBackup}
                     onRestoreBackup={handleRestoreBackup}

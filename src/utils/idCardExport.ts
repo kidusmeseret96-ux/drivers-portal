@@ -723,3 +723,184 @@ export function downloadNormalIdCardImage(
 ): Promise<void> {
   return exportIdCardImage(member, settings, false, printLang);
 }
+
+async function renderBatchIdCardsSheetCanvas(
+  members: AdaMember[],
+  settings: AdaSettings,
+  inverted: boolean,
+  langOverride?: LanguageCode
+): Promise<HTMLCanvasElement | null> {
+  const batch = members.slice(0, 5);
+  if (batch.length === 0) return null;
+
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
+  const effectiveLang = langOverride ?? settings.defaultPrintLanguage ?? settings.language;
+
+  const [logoImg, stampImg, chairmanSigImg, ...photoImgs] = await Promise.all([
+    loadImage(settings.logoDataUrl || ASSOCIATION_LOGO_PATH),
+    settings.officialStampDataUrl ? loadImage(settings.officialStampDataUrl) : Promise.resolve(null),
+    settings.chairmanSignatureDataUrl
+      ? loadImage(settings.chairmanSignatureDataUrl)
+      : Promise.resolve(null),
+    ...batch.map((m) => (m.photoDataUrl ? loadImage(m.photoDataUrl) : Promise.resolve(null))),
+  ]);
+
+  // Exact A4 portrait at 300 DPI (2480 x 3508 px) holding up to 5 stacked Front|Back CR80 pairs
+  const cardW = 1012;
+  const cardH = 638;
+  const gapX = 48;
+  const paddingX = 204; // 204*2 + 1012*2 + 48 = 2480 px
+  const rowGap = 44;
+  const paddingY = 71; // 71*2 + 5*638 + 4*44 = 3508 px
+
+  const canvasW = paddingX * 2 + cardW * 2 + gapX; // 2480 px
+  const canvasH = paddingY * 2 + 5 * cardH + 4 * rowGap; // 3508 px
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  ctx.save();
+  if (inverted) {
+    // Mirror the full sheet horizontally so print & lamination output matches upright reading order
+    ctx.translate(canvasW, 0);
+    ctx.scale(-1, 1);
+  }
+
+  const frontX = paddingX;
+  const backX = paddingX + cardW + gapX;
+
+  for (let i = 0; i < batch.length; i += 1) {
+    const member = batch[i];
+    const rowY = paddingY + i * (cardH + rowGap);
+
+    drawFrontCard(
+      ctx,
+      frontX,
+      rowY,
+      cardW,
+      cardH,
+      member,
+      settings,
+      logoImg,
+      photoImgs[i] ?? null,
+      effectiveLang
+    );
+    drawBackCard(
+      ctx,
+      backX,
+      rowY,
+      cardW,
+      cardH,
+      member,
+      settings,
+      logoImg,
+      effectiveLang,
+      stampImg,
+      chairmanSigImg
+    );
+
+    // Vertical dashed fold/trim divider between Front (left) and Back (right)
+    ctx.save();
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    ctx.moveTo(paddingX + cardW + gapX / 2, rowY - 12);
+    ctx.lineTo(paddingX + cardW + gapX / 2, rowY + cardH + 12);
+    ctx.stroke();
+    ctx.restore();
+
+    // Horizontal dashed cut line between stacked member IDs
+    if (i < batch.length - 1) {
+      ctx.save();
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([12, 10]);
+      ctx.beginPath();
+      ctx.moveTo(paddingX - 24, rowY + cardH + rowGap / 2);
+      ctx.lineTo(paddingX + cardW * 2 + gapX + 24, rowY + cardH + rowGap / 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  ctx.restore();
+  return canvas;
+}
+
+export async function generateBatchIdSheetPreviewDataUrl(
+  members: AdaMember[],
+  settings: AdaSettings,
+  inverted: boolean,
+  langOverride?: LanguageCode
+): Promise<string | null> {
+  const fullCanvas = await renderBatchIdCardsSheetCanvas(members, settings, inverted, langOverride);
+  if (!fullCanvas) return null;
+
+  const previewW = 930;
+  const previewH = Math.round((fullCanvas.height / fullCanvas.width) * previewW);
+  const scaled = document.createElement('canvas');
+  scaled.width = previewW;
+  scaled.height = previewH;
+  const sctx = scaled.getContext('2d');
+  if (!sctx) return fullCanvas.toDataURL('image/png');
+  sctx.fillStyle = '#FFFFFF';
+  sctx.fillRect(0, 0, previewW, previewH);
+  sctx.drawImage(fullCanvas, 0, 0, previewW, previewH);
+  return scaled.toDataURL('image/png');
+}
+
+async function exportBatchIdCardsSheetImage(
+  members: AdaMember[],
+  settings: AdaSettings,
+  inverted: boolean,
+  langOverride?: LanguageCode
+): Promise<void> {
+  const canvas = await renderBatchIdCardsSheetCanvas(members, settings, inverted, langOverride);
+  if (!canvas) return;
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((b) => resolve(b), 'image/png', 1.0)
+  );
+  if (!blob) return;
+
+  const effectiveLang = langOverride ?? settings.defaultPrintLanguage ?? settings.language;
+  const count = Math.min(members.length, 5);
+  const modeSuffix = inverted ? 'inverted' : 'normal';
+  const filename = `ada-print-ids-${count}-sheet-${modeSuffix}-${effectiveLang}.png`;
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export function downloadInvertedBatchIdCardsSheet(
+  members: AdaMember[],
+  settings: AdaSettings,
+  printLang?: LanguageCode
+): Promise<void> {
+  return exportBatchIdCardsSheetImage(members, settings, true, printLang);
+}
+
+export function downloadNormalBatchIdCardsSheet(
+  members: AdaMember[],
+  settings: AdaSettings,
+  printLang?: LanguageCode
+): Promise<void> {
+  return exportBatchIdCardsSheetImage(members, settings, false, printLang);
+}
