@@ -1,5 +1,5 @@
 import React, {useMemo, useState} from 'react';
-import {Check, Download, IdCard, KeyRound, Plus, Printer, Search, Trash2, Upload, X} from 'lucide-react';
+import {Check, Download, IdCard, KeyRound, Pencil, Plus, Printer, Search, Trash2, Upload, X} from 'lucide-react';
 import {AddMemberModal} from '../../components/AddMemberModal';
 import {MemberComplianceFormModal} from '../../components/MemberComplianceFormModal';
 import {MemberIdCardModal} from '../../components/MemberIdCardModal';
@@ -25,7 +25,7 @@ import {
   createId,
   downloadCsv,
   formatDate,
-  nextSequentialCode,
+  nextAvailableAdaMemberId,
   parseCsvText,
   todayIsoDate,
 } from '../../utils/formatters';
@@ -37,6 +37,7 @@ interface AdaMembersViewProps {
   payments?: AdaPayment[];
   penalties?: AdaPenalty[];
   onAddMember: (member: AdaMember) => Promise<void>;
+  onUpdateMember?: (member: AdaMember) => Promise<void>;
   onBulkAddMembers: (members: AdaMember[]) => Promise<void>;
   onArchiveMember: (memberId: string) => Promise<void>;
   onUpdateMemberRole?: (memberId: string, nextRole: string) => Promise<void>;
@@ -49,6 +50,7 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
   payments = [],
   penalties = [],
   onAddMember,
+  onUpdateMember,
   onBulkAddMembers,
   onArchiveMember,
   onUpdateMemberRole,
@@ -59,6 +61,7 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<'All' | MemberStatus>('All');
   const [roleFilter, setRoleFilter] = useState<'All' | MemberRole>('All');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingMember, setEditingMember] = useState<AdaMember | null>(null);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [csvText, setCsvText] = useState('');
   const [csvNotice, setCsvNotice] = useState<string | null>(null);
@@ -86,6 +89,20 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
 
   const handleSaveNewMember = async (member: AdaMember, openComplianceAfter?: boolean) => {
     await onAddMember(member);
+    if (openComplianceAfter) {
+      setComplianceMember(member);
+    } else {
+      setViewingMember(member);
+    }
+  };
+
+  const handleSaveEditedMember = async (member: AdaMember, openComplianceAfter?: boolean) => {
+    if (onUpdateMember) {
+      await onUpdateMember(member);
+    } else {
+      await onAddMember(member);
+    }
+    setEditingMember(null);
     if (openComplianceAfter) {
       setComplianceMember(member);
     } else {
@@ -208,16 +225,14 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
     const emNameIdx = findCol(['emergencycontactname', 'emergencyname']);
     const emPhoneIdx = findCol(['emergencycontactphone', 'emergencyphone']);
 
-    const existingCodes = members.map((m) => m.memberId);
     const imported: AdaMember[] = [];
 
     for (const row of rows) {
       const fullName = (row[nameIdx] ?? '').trim();
       if (!fullName) continue;
-      const memberId = nextSequentialCode(
-        'ADA-',
-        [...existingCodes, ...imported.map((i) => i.memberId)],
-        4
+      const memberId = nextAvailableAdaMemberId(
+        members,
+        imported.map((i) => i.memberId)
       );
       const rawStatus = statusIdx >= 0 ? row[statusIdx]?.trim() : 'Active';
       const status: MemberStatus =
@@ -456,6 +471,20 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
                           <IdCard className="h-3 w-3" />
                           {translate(lang, 'recordIdBtn')}
                         </button>
+                        {onUpdateMember && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmDeleteId(null);
+                              setConfirmResetPinId(null);
+                              setEditingMember(m);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </button>
+                        )}
                         <button
                           type="button"
                           disabled={printingId === m.id}
@@ -579,6 +608,19 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
         />
       )}
 
+      {/* Edit Member Drawer */}
+      {editingMember && (
+        <AddMemberModal
+          isOpen={Boolean(editingMember)}
+          language={lang}
+          settings={settings}
+          existingMembers={members}
+          editingMember={editingMember}
+          onClose={() => setEditingMember(null)}
+          onSaveMember={handleSaveEditedMember}
+        />
+      )}
+
       {/* Member Record & Two-Sided ID Card Modal */}
       <MemberIdCardModal
         member={viewingMember}
@@ -588,6 +630,14 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
         settings={settings}
         onChangeMemberRole={onUpdateMemberRole}
         onResetPortalPin={onResetPortalPin}
+        onEditMember={
+          onUpdateMember
+            ? (m) => {
+                setViewingMember(null);
+                setEditingMember(m);
+              }
+            : undefined
+        }
         onClose={() => setViewingMember(null)}
       />
 

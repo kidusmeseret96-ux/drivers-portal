@@ -23,7 +23,7 @@ import {calculateAgeFromDob} from '../utils/adaCalculations';
 import {
   compressImageToDataUrl,
   createId,
-  nextSequentialCode,
+  nextAvailableAdaMemberId,
   todayIsoDate,
 } from '../utils/formatters';
 import {
@@ -37,6 +37,7 @@ interface AddMemberModalProps {
   language: LanguageCode;
   settings: AdaSettings;
   existingMembers: AdaMember[];
+  editingMember?: AdaMember | null;
   onClose: () => void;
   onSaveMember: (member: AdaMember, openComplianceAfter?: boolean) => Promise<void>;
 }
@@ -107,63 +108,144 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   language,
   settings,
   existingMembers,
+  editingMember = null,
   onClose,
   onSaveMember,
 }) => {
-  const autoMemberId = nextSequentialCode(
-    'ADA-',
-    existingMembers.map((m) => m.memberId),
-    4
-  );
+  const isEditing = Boolean(editingMember);
+  const autoMemberId = nextAvailableAdaMemberId(existingMembers);
+  const [memberId, setMemberId] = useState(editingMember?.memberId ?? autoMemberId);
+  const [idError, setIdError] = useState<string | null>(null);
   const [showCompliancePreview, setShowCompliancePreview] = useState(false);
-  const [complianceAcknowledged, setComplianceAcknowledged] = useState(false);
+  const [complianceAcknowledged, setComplianceAcknowledged] = useState(Boolean(editingMember));
 
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [gender, setGender] = useState<MemberGender>('Female');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [age, setAge] = useState<number | ''>('');
-  const [bloodType, setBloodType] = useState('O+');
-  const [photoDataUrl, setPhotoDataUrl] = useState<string | undefined>(undefined);
+  const [fullName, setFullName] = useState(editingMember?.fullName ?? '');
+  const [phone, setPhone] = useState(editingMember?.phone ?? '');
+  const [gender, setGender] = useState<MemberGender>(editingMember?.gender ?? 'Female');
+  const [dateOfBirth, setDateOfBirth] = useState(editingMember?.dateOfBirth ?? '');
+  const [age, setAge] = useState<number | ''>(editingMember?.age ?? '');
+  const [bloodType, setBloodType] = useState(editingMember?.bloodType ?? 'O+');
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | undefined>(editingMember?.photoDataUrl);
 
-  const [vehiclePlate, setVehiclePlate] = useState('');
-  const [vehicleMakeModel, setVehicleMakeModel] = useState('');
-  const [trailerPlateOrChassis, setTrailerPlateOrChassis] = useState('');
-  const [boloExpiry, setBoloExpiry] = useState('');
-  const [insuranceProvider, setInsuranceProvider] = useState('');
-  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
-  const [insuranceType, setInsuranceType] = useState<InsuranceType>('Third-Party');
-  const [insuranceExpiry, setInsuranceExpiry] = useState('');
-  const [medicalExpiry, setMedicalExpiry] = useState('');
-  const [highwayClearanceExpiry, setHighwayClearanceExpiry] = useState('');
-  const [insuranceImageDataUrl, setInsuranceImageDataUrl] = useState<string | undefined>(undefined);
-  const [signatureDataUrl, setSignatureDataUrl] = useState<string | undefined>(undefined);
-  const [role, setRole] = useState<MemberRole>('Member');
-  const [employer, setEmployer] = useState('');
-  const [location, setLocation] = useState('');
-  const [joinDate, setJoinDate] = useState(todayIsoDate());
-  const [status, setStatus] = useState<MemberStatus>('Active');
+  const [vehiclePlate, setVehiclePlate] = useState(editingMember?.vehiclePlate ?? '');
+  const [vehicleMakeModel, setVehicleMakeModel] = useState(editingMember?.vehicleMakeModel ?? '');
+  const [trailerPlateOrChassis, setTrailerPlateOrChassis] = useState(
+    editingMember?.trailerPlateOrChassis ?? ''
+  );
+  const [boloExpiry, setBoloExpiry] = useState(editingMember?.boloExpiry ?? '');
+  const [insuranceProvider, setInsuranceProvider] = useState(
+    editingMember?.insuranceProvider ?? ''
+  );
+  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState(
+    editingMember?.insurancePolicyNumber ?? ''
+  );
+  const [insuranceType, setInsuranceType] = useState<InsuranceType>(
+    editingMember?.insuranceType ?? 'Third-Party'
+  );
+  const [insuranceExpiry, setInsuranceExpiry] = useState(editingMember?.insuranceExpiry ?? '');
+  const [medicalExpiry, setMedicalExpiry] = useState(editingMember?.medicalExpiry ?? '');
+  const [highwayClearanceExpiry, setHighwayClearanceExpiry] = useState(
+    editingMember?.highwayClearanceExpiry ?? ''
+  );
+  const [insuranceImageDataUrl, setInsuranceImageDataUrl] = useState<string | undefined>(
+    editingMember?.insuranceImageDataUrl
+  );
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | undefined>(
+    editingMember?.signatureDataUrl
+  );
+  const [role, setRole] = useState<MemberRole>(editingMember?.role ?? 'Member');
+  const [employer, setEmployer] = useState(editingMember?.employer ?? '');
+  const [location, setLocation] = useState(editingMember?.location ?? '');
+  const [joinDate, setJoinDate] = useState(editingMember?.joinDate ?? todayIsoDate());
+  const [status, setStatus] = useState<MemberStatus>(editingMember?.status ?? 'Active');
 
-  const [emergencyContactName, setEmergencyContactName] = useState('');
-  const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
+  const [emergencyContactName, setEmergencyContactName] = useState(
+    editingMember?.emergencyContactName ?? ''
+  );
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState(
+    editingMember?.emergencyContactPhone ?? ''
+  );
 
-  const [licenseNumber, setLicenseNumber] = useState('');
-  const [licenseExpiry, setLicenseExpiry] = useState('');
-  const [licenseImageDataUrl, setLicenseImageDataUrl] = useState<string | undefined>(undefined);
-  const [faydaFrontDataUrl, setFaydaFrontDataUrl] = useState<string | undefined>(undefined);
-  const [faydaBackDataUrl, setFaydaBackDataUrl] = useState<string | undefined>(undefined);
+  const [licenseNumber, setLicenseNumber] = useState(editingMember?.licenseNumber ?? '');
+  const [licenseExpiry, setLicenseExpiry] = useState(editingMember?.licenseExpiry ?? '');
+  const [licenseImageDataUrl, setLicenseImageDataUrl] = useState<string | undefined>(
+    editingMember?.licenseImageDataUrl
+  );
+  const [faydaFrontDataUrl, setFaydaFrontDataUrl] = useState<string | undefined>(
+    editingMember?.faydaFrontDataUrl
+  );
+  const [faydaBackDataUrl, setFaydaBackDataUrl] = useState<string | undefined>(
+    editingMember?.faydaBackDataUrl
+  );
 
-  const [isMarried, setIsMarried] = useState(false);
-  const [spouseName, setSpouseName] = useState('');
-  const [spouseAge, setSpouseAge] = useState<number | ''>('');
-  const [spouseOccupation, setSpouseOccupation] = useState('');
-  const [spousePhone, setSpousePhone] = useState('');
-  const [spousePhoto, setSpousePhoto] = useState<string | undefined>(undefined);
-  const [spouseFaydaFront, setSpouseFaydaFront] = useState<string | undefined>(undefined);
-  const [spouseFaydaBack, setSpouseFaydaBack] = useState<string | undefined>(undefined);
+  const [isMarried, setIsMarried] = useState(Boolean(editingMember?.isMarried));
+  const [spouseName, setSpouseName] = useState(editingMember?.spouse?.name ?? '');
+  const [spouseAge, setSpouseAge] = useState<number | ''>(editingMember?.spouse?.age ?? '');
+  const [spouseOccupation, setSpouseOccupation] = useState(
+    editingMember?.spouse?.occupation ?? ''
+  );
+  const [spousePhone, setSpousePhone] = useState(editingMember?.spouse?.phone ?? '');
+  const [spousePhoto, setSpousePhoto] = useState<string | undefined>(
+    editingMember?.spouse?.photoDataUrl
+  );
+  const [spouseFaydaFront, setSpouseFaydaFront] = useState<string | undefined>(
+    editingMember?.spouse?.faydaFrontDataUrl
+  );
+  const [spouseFaydaBack, setSpouseFaydaBack] = useState<string | undefined>(
+    editingMember?.spouse?.faydaBackDataUrl
+  );
 
-  const [children, setChildren] = useState<ChildDetails[]>([]);
+  const [children, setChildren] = useState<ChildDetails[]>(
+    editingMember?.children ? editingMember.children.map((c) => ({...c})) : []
+  );
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setIdError(null);
+    setMemberId(editingMember?.memberId ?? nextAvailableAdaMemberId(existingMembers));
+    setComplianceAcknowledged(Boolean(editingMember));
+    setFullName(editingMember?.fullName ?? '');
+    setPhone(editingMember?.phone ?? '');
+    setGender(editingMember?.gender ?? 'Female');
+    setDateOfBirth(editingMember?.dateOfBirth ?? '');
+    setAge(editingMember?.age ?? '');
+    setBloodType(editingMember?.bloodType ?? 'O+');
+    setPhotoDataUrl(editingMember?.photoDataUrl);
+    setVehiclePlate(editingMember?.vehiclePlate ?? '');
+    setVehicleMakeModel(editingMember?.vehicleMakeModel ?? '');
+    setTrailerPlateOrChassis(editingMember?.trailerPlateOrChassis ?? '');
+    setBoloExpiry(editingMember?.boloExpiry ?? '');
+    setInsuranceProvider(editingMember?.insuranceProvider ?? '');
+    setInsurancePolicyNumber(editingMember?.insurancePolicyNumber ?? '');
+    setInsuranceType(editingMember?.insuranceType ?? 'Third-Party');
+    setInsuranceExpiry(editingMember?.insuranceExpiry ?? '');
+    setMedicalExpiry(editingMember?.medicalExpiry ?? '');
+    setHighwayClearanceExpiry(editingMember?.highwayClearanceExpiry ?? '');
+    setInsuranceImageDataUrl(editingMember?.insuranceImageDataUrl);
+    setSignatureDataUrl(editingMember?.signatureDataUrl);
+    setRole(editingMember?.role ?? 'Member');
+    setEmployer(editingMember?.employer ?? '');
+    setLocation(editingMember?.location ?? '');
+    setJoinDate(editingMember?.joinDate ?? todayIsoDate());
+    setStatus(editingMember?.status ?? 'Active');
+    setEmergencyContactName(editingMember?.emergencyContactName ?? '');
+    setEmergencyContactPhone(editingMember?.emergencyContactPhone ?? '');
+    setLicenseNumber(editingMember?.licenseNumber ?? '');
+    setLicenseExpiry(editingMember?.licenseExpiry ?? '');
+    setLicenseImageDataUrl(editingMember?.licenseImageDataUrl);
+    setFaydaFrontDataUrl(editingMember?.faydaFrontDataUrl);
+    setFaydaBackDataUrl(editingMember?.faydaBackDataUrl);
+    setIsMarried(Boolean(editingMember?.isMarried));
+    setSpouseName(editingMember?.spouse?.name ?? '');
+    setSpouseAge(editingMember?.spouse?.age ?? '');
+    setSpouseOccupation(editingMember?.spouse?.occupation ?? '');
+    setSpousePhone(editingMember?.spouse?.phone ?? '');
+    setSpousePhoto(editingMember?.spouse?.photoDataUrl);
+    setSpouseFaydaFront(editingMember?.spouse?.faydaFrontDataUrl);
+    setSpouseFaydaBack(editingMember?.spouse?.faydaBackDataUrl);
+    setChildren(editingMember?.children ? editingMember.children.map((c) => ({...c})) : []);
+  }, [isOpen, editingMember?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -204,11 +286,27 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const saveMemberRecord = async (openComplianceAfter: boolean) => {
     if (!fullName.trim() || !phone.trim() || !gender) return;
+    const cleanMemberId = (memberId || autoMemberId).trim().toUpperCase();
+    if (!cleanMemberId) {
+      setIdError('Member ID is required.');
+      return;
+    }
+    const duplicate = existingMembers.some(
+      (m) =>
+        !m.deletedAt &&
+        m.id !== editingMember?.id &&
+        m.memberId.trim().toUpperCase() === cleanMemberId
+    );
+    if (duplicate) {
+      setIdError(`Member ID ${cleanMemberId} is already assigned to another active member.`);
+      return;
+    }
+    setIdError(null);
     setIsSaving(true);
     try {
-      const newMember: AdaMember = {
-        id: createId('mem'),
-        memberId: autoMemberId,
+      const savedMember: AdaMember = {
+        id: editingMember ? editingMember.id : createId('mem'),
+        memberId: cleanMemberId,
         photoDataUrl,
         fullName: fullName.trim(),
         phone: phone.trim(),
@@ -253,9 +351,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             }
           : undefined,
         children,
-        createdAt: new Date().toISOString(),
+        deletedAt: editingMember?.deletedAt,
+        statusBeforeDelete: editingMember?.statusBeforeDelete,
+        previousMemberId: editingMember?.previousMemberId,
+        createdAt: editingMember ? editingMember.createdAt : new Date().toISOString(),
       };
-      await onSaveMember(newMember, openComplianceAfter);
+      await onSaveMember(savedMember, openComplianceAfter);
       onClose();
     } finally {
       setIsSaving(false);
@@ -268,7 +369,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   };
 
   const liveDraftForCompliance: ComplianceFormDraft = {
-    memberId: autoMemberId,
+    memberId: (memberId || autoMemberId).trim().toUpperCase(),
     fullName,
     phone,
     gender,
@@ -309,10 +410,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
           <div className="flex items-center justify-between border-b border-slate-200 bg-[#0B2C5D] px-6 py-4 text-white dark:border-slate-800 dark:bg-[#0B172B]">
             <div>
               <p className="font-mono text-xs text-amber-300">
-                {translate(language, 'autoIdLabel', {id: autoMemberId})}
+                {isEditing
+                  ? memberId
+                  : translate(language, 'autoIdLabel', {id: memberId || autoMemberId})}
               </p>
               <h2 className="font-display text-lg font-bold text-white">
-                {translate(language, 'addMemberTitle')}
+                {isEditing ? `Edit Member · ${editingMember?.fullName}` : translate(language, 'addMemberTitle')}
               </h2>
             </div>
             <button
@@ -407,6 +510,28 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
               {translate(language, 'secBasicProfile')}
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {isEditing && (
+                <div className="sm:col-span-3">
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Member ID
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={memberId}
+                    onChange={(e) => {
+                      setMemberId(e.target.value.toUpperCase());
+                      if (idError) setIdError(null);
+                    }}
+                    className="mt-1 w-full max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs uppercase text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                  {idError && (
+                    <p className="mt-1 text-[11px] font-medium text-red-600 dark:text-red-400">
+                      {idError}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                   {translate(language, 'fullName')}
@@ -1042,7 +1167,9 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             >
               {isSaving
                 ? translate(language, 'savingLabel')
-                : translate(language, 'saveMemberBtn', {id: autoMemberId})}
+                : isEditing
+                  ? `Save Changes (${memberId || autoMemberId})`
+                  : translate(language, 'saveMemberBtn', {id: memberId || autoMemberId})}
             </button>
           </div>
         </form>

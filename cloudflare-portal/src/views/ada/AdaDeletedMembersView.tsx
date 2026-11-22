@@ -68,7 +68,7 @@ export const AdaDeletedMembersView: React.FC<AdaDeletedMembersViewProps> = ({
                         {m.fullName}
                       </div>
                       <div className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                        {m.memberId}
+                        {m.previousMemberId || m.memberId}
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300">

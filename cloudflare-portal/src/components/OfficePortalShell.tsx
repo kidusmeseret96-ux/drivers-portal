@@ -47,7 +47,7 @@ import type {
   TripStatus,
 } from '../types/ada';
 import {formatEthiopianDate} from '../utils/ethiopianCalendar';
-import {todayIsoDate} from '../utils/formatters';
+import {nextAvailableAdaMemberId, todayIsoDate} from '../utils/formatters';
 import {ASSOCIATION_LOGO_PATH} from '../utils/idCardExport';
 import {AdaDeletedMembersView} from '../views/ada/AdaDeletedMembersView';
 import {AdaFleetInsuranceView} from '../views/ada/AdaFleetInsuranceView';
@@ -180,11 +180,21 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
     setMembers((prev) => [...prev, ...newMembers]);
   };
 
+  const handleUpdateMember = async (updated: AdaMember) => {
+    await portalAdminMutate(token, 'members', updated);
+    setMembers((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+  };
+
   const handleArchiveMember = async (id: string) => {
     const existing = members.find((m) => m.id === id);
     if (!existing) return;
+    const originalCode = existing.previousMemberId || existing.memberId;
     const archived: AdaMember = {
       ...existing,
+      memberId: existing.deletedAt
+        ? existing.memberId
+        : `DEL-${originalCode}-${existing.id.slice(-4)}`,
+      previousMemberId: originalCode,
       statusBeforeDelete: existing.status,
       deletedAt: todayIsoDate(),
     };
@@ -195,11 +205,25 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
   const handleRestoreMember = async (id: string) => {
     const existing = members.find((m) => m.id === id);
     if (!existing) return;
+    const desiredId =
+      existing.previousMemberId ||
+      (existing.memberId.startsWith('DEL-')
+        ? existing.memberId.replace(/^DEL-/, '').replace(/-[^-]+$/, '')
+        : existing.memberId);
+    const isDesiredTaken = members.some(
+      (m) =>
+        !m.deletedAt &&
+        m.id !== existing.id &&
+        m.memberId.trim().toUpperCase() === desiredId.trim().toUpperCase()
+    );
+    const restoredMemberId = isDesiredTaken ? nextAvailableAdaMemberId(members) : desiredId;
     const restored: AdaMember = {
       ...existing,
+      memberId: restoredMemberId,
       status: existing.statusBeforeDelete ?? 'Active',
       deletedAt: undefined,
       statusBeforeDelete: undefined,
+      previousMemberId: undefined,
     };
     await portalAdminMutate(token, 'members', restored);
     setMembers((prev) => prev.map((m) => (m.id === id ? restored : m)));
@@ -616,6 +640,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
                 payments={payments}
                 penalties={penalties}
                 onAddMember={handleAddMember}
+                onUpdateMember={handleUpdateMember}
                 onBulkAddMembers={handleBulkAddMembers}
                 onArchiveMember={handleArchiveMember}
                 onUpdateMemberRole={handleUpdateMemberRole}

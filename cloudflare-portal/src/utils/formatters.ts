@@ -99,6 +99,39 @@ export function nextAdaMemberId(existingIds: string[]): string {
   return nextSequentialCode('ADA-', existingIds, 4);
 }
 
+export function nextAvailableAdaMemberId(
+  members: Array<{memberId: string; deletedAt?: string}>,
+  extraActiveCodes: string[] = []
+): string {
+  const usedNumbers = new Set<number>();
+  const prefix = 'ADA-';
+
+  const collect = (code?: string) => {
+    if (!code) return;
+    const upper = code.trim().toUpperCase();
+    if (!upper.startsWith(prefix)) return;
+    const match = upper.slice(prefix.length).match(/^(\d+)$/);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      if (val > 0) usedNumbers.add(val);
+    }
+  };
+
+  for (const m of members) {
+    if (m.deletedAt) continue;
+    collect(m.memberId);
+  }
+  for (const code of extraActiveCodes) {
+    collect(code);
+  }
+
+  let candidate = 1;
+  while (usedNumbers.has(candidate)) {
+    candidate += 1;
+  }
+  return `${prefix}${String(candidate).padStart(4, '0')}`;
+}
+
 export function nextPaymentReference(existingRefs: string[]): string {
   const year = new Date().getFullYear();
   return nextSequentialCode(`PAY-${year}-`, existingRefs, 4);

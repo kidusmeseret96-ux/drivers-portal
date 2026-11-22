@@ -724,6 +724,50 @@ export function downloadNormalIdCardImage(
   return exportIdCardImage(member, settings, false, printLang);
 }
 
+const PNG_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32Bytes(bytes: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i += 1) {
+    c = PNG_CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+async function injectPngDpi300(blob: Blob): Promise<Blob> {
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  // PNG signature (8 bytes) + IHDR chunk (25 bytes) = 33 bytes
+  if (buf.length < 33) return blob;
+  const ppu = 11811; // 300 DPI = 11811 pixels per meter
+  const phys = new Uint8Array(21);
+  const view = new DataView(phys.buffer);
+  view.setUint32(0, 9); // chunk data length
+  phys[4] = 0x70; // 'p'
+  phys[5] = 0x48; // 'H'
+  phys[6] = 0x59; // 'Y'
+  phys[7] = 0x73; // 's'
+  view.setUint32(8, ppu);
+  view.setUint32(12, ppu);
+  phys[16] = 1; // unit = meter
+  view.setUint32(17, crc32Bytes(phys.subarray(4, 17)));
+
+  const out = new Uint8Array(buf.length + phys.length);
+  out.set(buf.subarray(0, 33), 0);
+  out.set(phys, 33);
+  out.set(buf.subarray(33), 33 + phys.length);
+  return new Blob([out], {type: 'image/png'});
+}
+
 async function renderBatchIdCardsSheetCanvas(
   members: AdaMember[],
   settings: AdaSettings,
@@ -748,16 +792,18 @@ async function renderBatchIdCardsSheetCanvas(
     ...batch.map((m) => (m.photoDataUrl ? loadImage(m.photoDataUrl) : Promise.resolve(null))),
   ]);
 
-  // Exact A4 portrait at 300 DPI (2480 x 3508 px) holding up to 5 stacked Front|Back CR80 pairs
-  const cardW = 1012;
-  const cardH = 638;
-  const gapX = 48;
-  const paddingX = 204; // 204*2 + 1012*2 + 48 = 2480 px
-  const rowGap = 44;
-  const paddingY = 71; // 71*2 + 5*638 + 4*44 = 3508 px
+  // Exact A4 portrait at 300 DPI (2480 x 3508 px, 210mm x 297mm) matching the 5-up Fayda sheet geometry
+  const baseCardW = 1012;
+  const baseCardH = 638;
+  const cardW = 1054;
+  const cardH = 662;
+  const gapX = 68;
+  const paddingX = 152; // 152 + 1054 + 68 + 1054 + 152 = 2480 px
+  const rowGap = 33;
+  const paddingY = 25; // rows start at y = 25, 720, 1415, 2110, 2805 (height 662 each)
 
   const canvasW = paddingX * 2 + cardW * 2 + gapX; // 2480 px
-  const canvasH = paddingY * 2 + 5 * cardH + 4 * rowGap; // 3508 px
+  const canvasH = 3508; // exact A4 300 DPI height (bottom margin 41 px)
 
   const canvas = document.createElement('canvas');
   canvas.width = canvasW;
@@ -771,36 +817,46 @@ async function renderBatchIdCardsSheetCanvas(
 
   ctx.save();
   if (inverted) {
-    // Mirror the full sheet horizontally so print & lamination output matches upright reading order
+    // Mirror the full A4 sheet horizontally so printing & lamination comes out right-side up
     ctx.translate(canvasW, 0);
     ctx.scale(-1, 1);
   }
 
   const frontX = paddingX;
   const backX = paddingX + cardW + gapX;
+  const scaleX = cardW / baseCardW;
+  const scaleY = cardH / baseCardH;
 
   for (let i = 0; i < batch.length; i += 1) {
     const member = batch[i];
     const rowY = paddingY + i * (cardH + rowGap);
 
+    ctx.save();
+    ctx.translate(frontX, rowY);
+    ctx.scale(scaleX, scaleY);
     drawFrontCard(
       ctx,
-      frontX,
-      rowY,
-      cardW,
-      cardH,
+      0,
+      0,
+      baseCardW,
+      baseCardH,
       member,
       settings,
       logoImg,
       photoImgs[i] ?? null,
       effectiveLang
     );
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(backX, rowY);
+    ctx.scale(scaleX, scaleY);
     drawBackCard(
       ctx,
-      backX,
-      rowY,
-      cardW,
-      cardH,
+      0,
+      0,
+      baseCardW,
+      baseCardH,
       member,
       settings,
       logoImg,
@@ -808,30 +864,7 @@ async function renderBatchIdCardsSheetCanvas(
       stampImg,
       chairmanSigImg
     );
-
-    // Vertical dashed fold/trim divider between Front (left) and Back (right)
-    ctx.save();
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([10, 8]);
-    ctx.beginPath();
-    ctx.moveTo(paddingX + cardW + gapX / 2, rowY - 12);
-    ctx.lineTo(paddingX + cardW + gapX / 2, rowY + cardH + 12);
-    ctx.stroke();
     ctx.restore();
-
-    // Horizontal dashed cut line between stacked member IDs
-    if (i < batch.length - 1) {
-      ctx.save();
-      ctx.strokeStyle = '#CBD5E1';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([12, 10]);
-      ctx.beginPath();
-      ctx.moveTo(paddingX - 24, rowY + cardH + rowGap / 2);
-      ctx.lineTo(paddingX + cardW * 2 + gapX + 24, rowY + cardH + rowGap / 2);
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 
   ctx.restore();
@@ -869,10 +902,12 @@ async function exportBatchIdCardsSheetImage(
   const canvas = await renderBatchIdCardsSheetCanvas(members, settings, inverted, langOverride);
   if (!canvas) return;
 
-  const blob = await new Promise<Blob | null>((resolve) =>
+  const rawBlob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob((b) => resolve(b), 'image/png', 1.0)
   );
-  if (!blob) return;
+  if (!rawBlob) return;
+
+  const blob = await injectPngDpi300(rawBlob);
 
   const effectiveLang = langOverride ?? settings.defaultPrintLanguage ?? settings.language;
   const count = Math.min(members.length, 5);

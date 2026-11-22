@@ -96,6 +96,7 @@ export interface AdaMember {
   children: ChildDetails[];
   deletedAt?: string;
   statusBeforeDelete?: MemberStatus;
+  previousMemberId?: string;
   createdAt: string;
 }
 
