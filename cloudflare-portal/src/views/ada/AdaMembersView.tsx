@@ -1,5 +1,5 @@
 import React, {useMemo, useState} from 'react';
-import {Download, IdCard, Plus, Printer, Search, Trash2, Upload, X} from 'lucide-react';
+import {Check, Download, IdCard, KeyRound, Plus, Printer, Search, Trash2, Upload, X} from 'lucide-react';
 import {AddMemberModal} from '../../components/AddMemberModal';
 import {MemberComplianceFormModal} from '../../components/MemberComplianceFormModal';
 import {MemberIdCardModal} from '../../components/MemberIdCardModal';
@@ -70,6 +70,9 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
   const setViewingMember = (m: AdaMember | null) => setViewingMemberId(m ? m.id : null);
   const [complianceMember, setComplianceMember] = useState<AdaMember | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmResetPinId, setConfirmResetPinId] = useState<string | null>(null);
+  const [resetPinDoneId, setResetPinDoneId] = useState<string | null>(null);
+  const [resettingPinId, setResettingPinId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
 
   const handlePrintIdImage = async (member: AdaMember) => {
@@ -462,6 +465,64 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
                           <Printer className="h-3 w-3" />
                           {translate(lang, 'printIdBtn')}
                         </button>
+                        {onResetPortalPin && (
+                          confirmResetPinId === m.id ? (
+                            <div className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 dark:border-amber-800 dark:bg-amber-950/40">
+                              <span className="px-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                                0000?
+                              </span>
+                              <button
+                                type="button"
+                                disabled={resettingPinId === m.id}
+                                onClick={async () => {
+                                  setResettingPinId(m.id);
+                                  try {
+                                    await onResetPortalPin(m.id);
+                                    setConfirmResetPinId(null);
+                                    setResetPinDoneId(m.id);
+                                    setTimeout(() => {
+                                      setResetPinDoneId((prev) => (prev === m.id ? null : prev));
+                                    }, 3000);
+                                  } finally {
+                                    setResettingPinId(null);
+                                  }
+                                }}
+                                className="rounded bg-[#0B2C5D] px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-[#034EA2] disabled:opacity-60"
+                              >
+                                {translate(lang, 'confirm')}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmResetPinId(null)}
+                                className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                              >
+                                {translate(lang, 'cancel')}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmDeleteId(null);
+                                setConfirmResetPinId(m.id);
+                              }}
+                              title="Reset this member's portal PIN back to 0000"
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-300/80 bg-amber-50/70 px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-800/70 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/60"
+                            >
+                              {resetPinDoneId === m.id ? (
+                                <>
+                                  <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                  <span>0000</span>
+                                </>
+                              ) : (
+                                <>
+                                  <KeyRound className="h-3 w-3" />
+                                  <span>Reset PIN</span>
+                                </>
+                              )}
+                            </button>
+                          )
+                        )}
                         {confirmDeleteId === m.id ? (
                           <div className="inline-flex items-center gap-1">
                             <button
@@ -485,7 +546,10 @@ export const AdaMembersView: React.FC<AdaMembersViewProps> = ({
                         ) : (
                           <button
                             type="button"
-                            onClick={() => setConfirmDeleteId(m.id)}
+                            onClick={() => {
+                              setConfirmResetPinId(null);
+                              setConfirmDeleteId(m.id);
+                            }}
                             aria-label={`${translate(lang, 'delete')} ${m.fullName}`}
                             className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400"
                           >
