@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CreditCard,
   Download,
+  Globe,
   HandHeart,
   IdCard,
   KeyRound,
@@ -18,15 +19,15 @@ import {
   User,
   Wrench,
 } from 'lucide-react';
+import {PORTAL_LANGUAGE_OPTIONS, translatePortal} from '../i18n/portalCopy';
 import {
-  translate,
   translateGender,
   translateRole,
   translateSpouseLabel,
   translateStatus,
 } from '../i18n/translations';
 import type {PortalWorkspace} from '../lib/supabasePortal';
-import type {AdaPayment} from '../types/ada';
+import type {AdaPayment, LanguageCode} from '../types/ada';
 import {calculateOverdueAccounts} from '../utils/adaCalculations';
 import {formatEthiopianDate} from '../utils/ethiopianCalendar';
 import {daysUntil, formatCurrency, formatDate, todayIsoDate} from '../utils/formatters';
@@ -44,24 +45,38 @@ type SelfTab = 'profile' | 'payments' | 'penalties' | 'trips' | 'aid';
 
 interface MemberSelfPortalProps {
   workspace: PortalWorkspace;
+  language: LanguageCode;
+  onLanguageChange: (lang: LanguageCode) => void;
   onRefresh: () => Promise<void>;
   onOpenChangePassword: () => void;
   onLogout: () => void;
 }
 
-function ExpiryBadge({label, date}: {label: string; date?: string}) {
+function ExpiryBadge({
+  label,
+  date,
+  lang,
+}: {
+  label: string;
+  date?: string;
+  lang: LanguageCode;
+}) {
   const days = daysUntil(date);
-  let tone = 'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300';
-  let statusText = date ? formatDate(date) : 'Not on file';
+  let tone =
+    'border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300';
+  let statusText = date ? formatDate(date) : translatePortal(lang, 'notOnFile');
   if (days !== null) {
     if (days < 0) {
-      tone = 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300';
-      statusText = `${formatDate(date)} (Expired)`;
+      tone =
+        'border-red-200 bg-red-50 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300';
+      statusText = `${formatDate(date)} (${translatePortal(lang, 'expiredTag')})`;
     } else if (days <= 30) {
-      tone = 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300';
-      statusText = `${formatDate(date)} (${days}d left)`;
+      tone =
+        'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300';
+      statusText = `${formatDate(date)} (${translatePortal(lang, 'daysLeftTag', {days})})`;
     } else {
-      tone = 'border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300';
+      tone =
+        'border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300';
     }
   }
   return (
@@ -74,13 +89,16 @@ function ExpiryBadge({label, date}: {label: string; date?: string}) {
 
 export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
   workspace,
+  language,
+  onLanguageChange,
   onRefresh,
   onOpenChangePassword,
   onLogout,
 }) => {
   const {currentMember: member, settings, payments, penalties, trips, mutualAid, incidents} =
     workspace;
-  const lang = settings.language || 'en';
+  const lang = language || settings.language || 'en';
+  const effectiveSettings = useMemo(() => ({...settings, language: lang}), [settings, lang]);
   const [activeTab, setActiveTab] = useState<SelfTab>('profile');
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   const [refreshing, setRefreshing] = useState(false);
@@ -112,9 +130,9 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
   );
 
   const overdueStanding = useMemo(() => {
-    const res = calculateOverdueAccounts([member], payments, settings);
+    const res = calculateOverdueAccounts([member], payments, effectiveSettings);
     return res.rows[0] ?? null;
-  }, [member, payments, settings]);
+  }, [member, payments, effectiveSettings]);
 
   const spouseHeading = translateSpouseLabel(lang, member.gender);
   const ecToday =
@@ -126,9 +144,9 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
     setDownloadingCard(true);
     try {
       if (inverted) {
-        await downloadInvertedIdCardImage(member, settings);
+        await downloadInvertedIdCardImage(member, effectiveSettings, lang);
       } else {
-        await downloadNormalIdCardImage(member, settings);
+        await downloadNormalIdCardImage(member, effectiveSettings, lang);
       }
     } finally {
       setDownloadingCard(false);
@@ -136,13 +154,23 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
   };
 
   const tabs: {id: SelfTab; label: string; icon: typeof User; count?: number}[] = [
-    {id: 'profile', label: 'My Profile & ID', icon: User},
-    {id: 'payments', label: 'My Payments', icon: CreditCard, count: payments.length},
-    {id: 'penalties', label: 'My Penalties', icon: AlertTriangle, count: penalties.length},
-    {id: 'trips', label: 'My Trips', icon: Route, count: trips.length},
+    {id: 'profile', label: translatePortal(lang, 'tabProfile'), icon: User},
+    {
+      id: 'payments',
+      label: translatePortal(lang, 'tabPayments'),
+      icon: CreditCard,
+      count: payments.length,
+    },
+    {
+      id: 'penalties',
+      label: translatePortal(lang, 'tabPenalties'),
+      icon: AlertTriangle,
+      count: penalties.length,
+    },
+    {id: 'trips', label: translatePortal(lang, 'tabTrips'), icon: Route, count: trips.length},
     {
       id: 'aid',
-      label: 'Mutual Aid & Incidents',
+      label: translatePortal(lang, 'tabAid'),
       icon: HandHeart,
       count: mutualAid.length + incidents.length,
     },
@@ -173,13 +201,34 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
                 {settings.associationName}
               </p>
               <p className="truncate text-[11px] text-sky-200">
-                Personal Member Portal · <span className="font-mono">{member.memberId}</span>
+                {translatePortal(lang, 'personalPortalSubtitle')} ·{' '}
+                <span className="font-mono">{member.memberId}</span>
                 {ecToday ? ` · ${ecToday}` : ''}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <label className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white">
+              <Globe className="h-3.5 w-3.5 text-amber-300" />
+              <select
+                aria-label={translatePortal(lang, 'languageLabel')}
+                value={PORTAL_LANGUAGE_OPTIONS.some((o) => o.code === lang) ? lang : 'en'}
+                onChange={(e) => onLanguageChange(e.target.value as LanguageCode)}
+                className="bg-transparent text-xs font-semibold text-white outline-none"
+              >
+                {PORTAL_LANGUAGE_OPTIONS.map((opt) => (
+                  <option
+                    key={opt.code}
+                    value={opt.code}
+                    className="bg-[#0B2C5D] text-white"
+                  >
+                    {opt.nativeLabel}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <button
               type="button"
               onClick={toggleDark}
@@ -201,7 +250,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-white/20 disabled:opacity-60"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <span className="hidden sm:inline">{translatePortal(lang, 'refreshBtn')}</span>
             </button>
             <button
               type="button"
@@ -209,7 +258,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/60 bg-amber-400/15 px-2.5 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-400/25"
             >
               <KeyRound className="h-3.5 w-3.5" />
-              <span>Change Password</span>
+              <span>{translatePortal(lang, 'changePasswordBtn')}</span>
             </button>
             <button
               type="button"
@@ -217,7 +266,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-500/30"
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
+              <span className="hidden sm:inline">{translatePortal(lang, 'signOutBtn')}</span>
             </button>
           </div>
         </div>
@@ -229,9 +278,11 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
             <div className="flex items-start gap-2.5">
               <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
               <div>
-                <p className="font-semibold">You are still using the default password (0000)</p>
+                <p className="font-semibold">
+                  {translatePortal(lang, 'defaultPinBannerTitle')}
+                </p>
                 <p className="mt-0.5 text-[11px] opacity-90">
-                  Change your password now to protect your private profile, ID card, and payment records.
+                  {translatePortal(lang, 'defaultPinBannerBody')}
                 </p>
               </div>
             </div>
@@ -240,7 +291,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               onClick={onOpenChangePassword}
               className="shrink-0 rounded-lg bg-[#0B2C5D] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#034EA2]"
             >
-              Change Password Now
+              {translatePortal(lang, 'changePasswordNowBtn')}
             </button>
           </div>
         )}
@@ -293,7 +344,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[#0B2C5D] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#034EA2] dark:bg-[#034EA2]"
               >
                 <IdCard className="h-3.5 w-3.5 text-amber-300" />
-                View Digital ID Card
+                {translatePortal(lang, 'viewDigitalIdBtn')}
               </button>
               <button
                 type="button"
@@ -302,7 +353,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               >
                 <Download className="h-3.5 w-3.5" />
-                Save ID (PNG)
+                {translatePortal(lang, 'saveIdPngBtn')}
               </button>
             </div>
           </div>
@@ -311,7 +362,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                My Total Approved Payments
+                {translatePortal(lang, 'totalApprovedPayments')}
               </p>
               <p className="mt-1 font-mono text-base font-bold text-emerald-700 dark:text-emerald-400">
                 {formatCurrency(approvedTotal, settings.currency)}
@@ -319,7 +370,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
             </div>
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Current Month Overdue Dues
+                {translatePortal(lang, 'currentMonthOverdue')}
               </p>
               <p
                 className={`mt-1 font-mono text-base font-bold ${
@@ -329,13 +380,13 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
                 }`}
               >
                 {overdueStanding
-                  ? `${formatCurrency(overdueStanding.totalDue, settings.currency)} (${overdueStanding.daysLate}d late)`
-                  : 'All Clear'}
+                  ? `${formatCurrency(overdueStanding.totalDue, settings.currency)} (${translatePortal(lang, 'daysLateSuffix', {days: overdueStanding.daysLate})})`
+                  : translatePortal(lang, 'allClear')}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                My Unpaid Penalties
+                {translatePortal(lang, 'myUnpaidPenalties')}
               </p>
               <p
                 className={`mt-1 font-mono text-base font-bold ${
@@ -346,7 +397,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               >
                 {unpaidPenaltiesTotal > 0
                   ? formatCurrency(unpaidPenaltiesTotal, settings.currency)
-                  : 'None'}
+                  : translatePortal(lang, 'noneLabel')}
               </p>
             </div>
           </div>
@@ -392,41 +443,47 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
             <section className="ada-surface rounded-2xl border p-5 space-y-4">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <User className="h-4 w-4 text-[#034EA2] dark:text-sky-400" />
-                Personal &amp; Contact Information
+                {translatePortal(lang, 'personalContactTitle')}
               </h2>
               <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">
                 <div>
-                  <span className="text-slate-500">Phone</span>
+                  <span className="text-slate-500">{translatePortal(lang, 'phoneLabel')}</span>
                   <p className="mt-0.5 font-mono font-semibold">{member.phone || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Gender &amp; Age</span>
+                  <span className="text-slate-500">{translatePortal(lang, 'genderAgeLabel')}</span>
                   <p className="mt-0.5 font-semibold">
                     {translateGender(lang, member.gender)} · {member.age || '—'}
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Blood Type</span>
+                  <span className="text-slate-500">{translatePortal(lang, 'bloodTypeLabel')}</span>
                   <p className="mt-0.5 font-semibold">{member.bloodType || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Join Date</span>
+                  <span className="text-slate-500">{translatePortal(lang, 'joinDateLabel')}</span>
                   <p className="mt-0.5 font-mono font-semibold">{formatDate(member.joinDate)}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Employer / Corridor</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'employerCorridorLabel')}
+                  </span>
                   <p className="mt-0.5 font-semibold">{member.employer || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Location</span>
+                  <span className="text-slate-500">{translatePortal(lang, 'locationLabel')}</span>
                   <p className="mt-0.5 font-semibold">{member.location || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Emergency Contact</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'emergencyContactLabel')}
+                  </span>
                   <p className="mt-0.5 font-semibold">{member.emergencyContactName || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Emergency Phone</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'emergencyPhoneLabel')}
+                  </span>
                   <p className="mt-0.5 font-mono font-semibold">
                     {member.emergencyContactPhone || '—'}
                   </p>
@@ -437,29 +494,39 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
             <section className="ada-surface rounded-2xl border p-5 space-y-4">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
                 <Truck className="h-4 w-4 text-[#034EA2] dark:text-sky-400" />
-                My Truck, Licence &amp; Compliance Documents
+                {translatePortal(lang, 'truckComplianceTitle')}
               </h2>
               <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-3">
                 <div>
-                  <span className="text-slate-500">Truck Make / Model</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'truckMakeModelLabel')}
+                  </span>
                   <p className="mt-0.5 font-semibold">{member.vehicleMakeModel || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Trailer / Chassis No.</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'trailerChassisLabel')}
+                  </span>
                   <p className="mt-0.5 font-mono font-semibold">
                     {member.trailerPlateOrChassis || '—'}
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Driver Licence No.</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'driverLicenceNoLabel')}
+                  </span>
                   <p className="mt-0.5 font-mono font-semibold">{member.licenseNumber || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Insurance Provider</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'insuranceProviderLabel')}
+                  </span>
                   <p className="mt-0.5 font-semibold">{member.insuranceProvider || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Insurance Policy No.</span>
+                  <span className="text-slate-500">
+                    {translatePortal(lang, 'insurancePolicyNoLabel')}
+                  </span>
                   <p className="mt-0.5 font-mono font-semibold">
                     {member.insurancePolicyNumber || '—'}{' '}
                     {member.insuranceType ? `(${member.insuranceType})` : ''}
@@ -468,13 +535,30 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-5">
-                <ExpiryBadge label="Driver Licence Expiry" date={member.licenseExpiry} />
-                <ExpiryBadge label="Annual Bolo Expiry" date={member.boloExpiry} />
-                <ExpiryBadge label="Insurance Expiry" date={member.insuranceExpiry} />
-                <ExpiryBadge label="Medical Fitness Expiry" date={member.medicalExpiry} />
                 <ExpiryBadge
-                  label="Highway Clearance"
+                  label={translatePortal(lang, 'licenceExpiryLabel')}
+                  date={member.licenseExpiry}
+                  lang={lang}
+                />
+                <ExpiryBadge
+                  label={translatePortal(lang, 'boloExpiryLabel')}
+                  date={member.boloExpiry}
+                  lang={lang}
+                />
+                <ExpiryBadge
+                  label={translatePortal(lang, 'insuranceExpiryLabel')}
+                  date={member.insuranceExpiry}
+                  lang={lang}
+                />
+                <ExpiryBadge
+                  label={translatePortal(lang, 'medicalExpiryLabel')}
+                  date={member.medicalExpiry}
+                  lang={lang}
+                />
+                <ExpiryBadge
+                  label={translatePortal(lang, 'highwayClearanceLabel')}
                   date={member.highwayClearanceExpiry}
+                  lang={lang}
                 />
               </div>
             </section>
@@ -483,7 +567,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               <section className="ada-surface rounded-2xl border p-5 space-y-4">
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   <ShieldCheck className="h-4 w-4 text-[#034EA2] dark:text-sky-400" />
-                  Registered Family ({spouseHeading} &amp; Children)
+                  {translatePortal(lang, 'registeredFamilyTitle', {spouse: spouseHeading})}
                 </h2>
                 {member.isMarried && member.spouse?.name && (
                   <div className="rounded-lg border border-slate-200 bg-white p-3.5 text-xs dark:border-slate-800 dark:bg-slate-900">
@@ -522,26 +606,34 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
         {activeTab === 'payments' && (
           <section className="ada-surface overflow-hidden rounded-2xl border">
             <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-              <h2 className="text-sm font-semibold">My Payment History &amp; Official Receipts</h2>
+              <h2 className="text-sm font-semibold">
+                {translatePortal(lang, 'paymentHistoryTitle')}
+              </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 bg-[#EBF2FA] text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
-                    <th className="px-4 py-3 font-medium">Reference</th>
-                    <th className="px-4 py-3 font-medium">Category</th>
-                    <th className="px-4 py-3 font-medium">Method</th>
-                    <th className="px-4 py-3 font-medium">Date</th>
-                    <th className="px-4 py-3 font-medium">Amount</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 text-right font-medium">Receipt</th>
+                    <th className="px-4 py-3 font-medium">
+                      {translatePortal(lang, 'colReference')}
+                    </th>
+                    <th className="px-4 py-3 font-medium">
+                      {translatePortal(lang, 'colCategory')}
+                    </th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colMethod')}</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colDate')}</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colAmount')}</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colStatus')}</th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      {translatePortal(lang, 'colReceipt')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {payments.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-10 text-center text-slate-500">
-                        No payment records found for your account yet.
+                        {translatePortal(lang, 'noPaymentsFound')}
                       </td>
                     </tr>
                   ) : (
@@ -573,7 +665,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
                             className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                           >
                             <Receipt className="h-3 w-3" />
-                            Invoice
+                            {translatePortal(lang, 'invoiceBtn')}
                           </button>
                         </td>
                       </tr>
@@ -589,17 +681,17 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
         {activeTab === 'penalties' && (
           <section className="ada-surface overflow-hidden rounded-2xl border">
             <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-              <h2 className="text-sm font-semibold">My Penalties &amp; Violations</h2>
+              <h2 className="text-sm font-semibold">{translatePortal(lang, 'penaltiesTitle')}</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 bg-[#EBF2FA] text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
-                    <th className="px-4 py-3 font-medium">Reason</th>
-                    <th className="px-4 py-3 font-medium">Date</th>
-                    <th className="px-4 py-3 font-medium">Amount</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Note</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colReason')}</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colDate')}</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colAmount')}</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colStatus')}</th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colNote')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -608,7 +700,7 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
                       <td colSpan={5} className="px-6 py-10 text-center text-slate-500">
                         <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                           <CheckCircle2 className="h-4 w-4" />
-                          No penalties on your record.
+                          {translatePortal(lang, 'noPenaltiesMsg')}
                         </span>
                       </td>
                     </tr>
@@ -640,24 +732,30 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
         {activeTab === 'trips' && (
           <section className="ada-surface overflow-hidden rounded-2xl border">
             <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-              <h2 className="text-sm font-semibold">My Dispatched Freight Trips</h2>
+              <h2 className="text-sm font-semibold">{translatePortal(lang, 'tripsTitle')}</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 bg-[#EBF2FA] text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
-                    <th className="px-4 py-3 font-medium">Waybill</th>
-                    <th className="px-4 py-3 font-medium">Route Corridor</th>
-                    <th className="px-4 py-3 font-medium">Cargo</th>
-                    <th className="px-4 py-3 font-medium">Dispatch Date</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">
+                      {translatePortal(lang, 'colWaybill')}
+                    </th>
+                    <th className="px-4 py-3 font-medium">
+                      {translatePortal(lang, 'colRouteCorridor')}
+                    </th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colCargo')}</th>
+                    <th className="px-4 py-3 font-medium">
+                      {translatePortal(lang, 'colDispatchDate')}
+                    </th>
+                    <th className="px-4 py-3 font-medium">{translatePortal(lang, 'colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {trips.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-10 text-center text-slate-500">
-                        No dispatch trips logged for your truck yet.
+                        {translatePortal(lang, 'noTripsMsg')}
                       </td>
                     </tr>
                   ) : (
@@ -697,13 +795,13 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                 <h2 className="flex items-center gap-2 text-sm font-semibold">
                   <HandHeart className="h-4 w-4 text-[#034EA2] dark:text-sky-400" />
-                  My Edir Mutual-Aid Payouts
+                  {translatePortal(lang, 'mutualAidTitle')}
                 </h2>
               </div>
               <div className="divide-y divide-slate-200 dark:divide-slate-800">
                 {mutualAid.length === 0 ? (
                   <p className="px-5 py-8 text-center text-xs text-slate-500">
-                    No mutual-aid records for your account.
+                    {translatePortal(lang, 'noMutualAidMsg')}
                   </p>
                 ) : (
                   mutualAid.map((aid) => (
@@ -731,13 +829,13 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
               <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                 <h2 className="flex items-center gap-2 text-sm font-semibold">
                   <Wrench className="h-4 w-4 text-[#034EA2] dark:text-sky-400" />
-                  My Incidents &amp; Roadside Advances
+                  {translatePortal(lang, 'incidentsTitle')}
                 </h2>
               </div>
               <div className="divide-y divide-slate-200 dark:divide-slate-800">
                 {incidents.length === 0 ? (
                   <p className="px-5 py-8 text-center text-xs text-slate-500">
-                    No incident advances logged for your account.
+                    {translatePortal(lang, 'noIncidentsMsg')}
                   </p>
                 ) : (
                   incidents.map((inc) => (
@@ -769,14 +867,14 @@ export const MemberSelfPortal: React.FC<MemberSelfPortalProps> = ({
         allMembers={[member]}
         payments={payments}
         penalties={penalties}
-        settings={settings}
+        settings={effectiveSettings}
         onClose={() => setShowIdModal(false)}
       />
 
       <PaymentReceiptModal
         payment={receiptPayment}
         member={member}
-        settings={settings}
+        settings={effectiveSettings}
         onClose={() => setReceiptPayment(null)}
       />
     </div>

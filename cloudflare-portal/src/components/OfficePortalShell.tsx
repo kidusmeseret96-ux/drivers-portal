@@ -6,6 +6,7 @@ import {
   BookOpen,
   Clock,
   CreditCard,
+  Globe,
   HandHeart,
   KeyRound,
   LayoutDashboard,
@@ -23,7 +24,8 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import {translate, translateRole, type TranslationKey} from '../i18n/translations';
+import {PORTAL_LANGUAGE_OPTIONS, translatePortal} from '../i18n/portalCopy';
+import {LANGUAGE_OPTIONS, translate, translateRole, type TranslationKey} from '../i18n/translations';
 import {
   portalAdminMutate,
   portalAdminResetMemberPassword,
@@ -40,6 +42,7 @@ import type {
   AdaSettings,
   AdaTrip,
   AdaView,
+  LanguageCode,
   PaymentApprovalStatus,
   TripStatus,
 } from '../types/ada';
@@ -87,6 +90,8 @@ const NAV_CONFIG: NavConfig[] = [
 interface OfficePortalShellProps {
   token: string;
   initialWorkspace: PortalWorkspace;
+  language: LanguageCode;
+  onLanguageChange: (lang: LanguageCode) => void;
   onRefresh: () => Promise<void>;
   onOpenChangePassword: () => void;
   onLogout: () => void;
@@ -95,6 +100,8 @@ interface OfficePortalShellProps {
 export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
   token,
   initialWorkspace,
+  language,
+  onLanguageChange,
   onRefresh,
   onOpenChangePassword,
   onLogout,
@@ -141,6 +148,8 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
       document.documentElement.classList.remove('dark');
     }
   }, [settings.theme]);
+
+  const activeSettings = useMemo(() => ({...settings, language}), [settings, language]);
 
   const pendingPaymentsCount = useMemo(
     () => payments.filter((p) => p.status === 'Pending').length,
@@ -340,13 +349,13 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
   const currentNavTitle = useMemo(() => {
     const item = NAV_CONFIG.find((n) => n.id === activeView);
-    return item ? translate(settings.language, item.labelKey) : '';
-  }, [activeView, settings.language]);
+    return item ? translate(language, item.labelKey) : '';
+  }, [activeView, language]);
 
   const isDark = settings.theme === 'dark';
   const ecTodayLabel =
     settings.showEthiopianCalendar !== false
-      ? formatEthiopianDate(todayIsoDate(), settings.language)
+      ? formatEthiopianDate(todayIsoDate(), language)
       : '';
 
   return (
@@ -387,7 +396,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
                 {settings.associationName}
               </p>
               <p className="truncate text-[10px] font-medium text-sky-200/90">
-                Cloud Office Portal
+                {translatePortal(language, 'cloudOfficeSubtitle')}
               </p>
             </div>
           </button>
@@ -422,7 +431,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
                       isActive ? 'text-amber-300' : 'text-slate-400 dark:text-slate-500'
                     }`}
                   />
-                  <span>{translate(settings.language, item.labelKey)}</span>
+                  <span>{translate(language, item.labelKey)}</span>
                 </span>
                 {item.id === 'payments' && pendingPaymentsCount > 0 && (
                   <span
@@ -448,7 +457,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
                 {currentMember.fullName}
               </p>
               <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                {currentMember.memberId} · {translateRole(settings.language, currentMember.role)}
+                {currentMember.memberId} · {translateRole(language, currentMember.role)}
               </p>
             </div>
           </div>
@@ -479,6 +488,37 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              <Globe className="h-3.5 w-3.5 text-[#034EA2] dark:text-sky-400" />
+              <select
+                aria-label={translatePortal(language, 'languageLabel')}
+                value={language}
+                onChange={(e) => onLanguageChange(e.target.value as LanguageCode)}
+                className="bg-transparent text-xs font-semibold text-slate-800 outline-none dark:text-slate-100"
+              >
+                {PORTAL_LANGUAGE_OPTIONS.map((opt) => (
+                  <option
+                    key={opt.code}
+                    value={opt.code}
+                    className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    {opt.nativeLabel}
+                  </option>
+                ))}
+                {LANGUAGE_OPTIONS.filter(
+                  (o) => !PORTAL_LANGUAGE_OPTIONS.some((p) => p.code === o.code)
+                ).map((opt) => (
+                  <option
+                    key={opt.code}
+                    value={opt.code}
+                    className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    {opt.nativeLabel}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <button
               type="button"
               onClick={() => handleSaveSettings({...settings, theme: isDark ? 'light' : 'dark'})}
@@ -501,7 +541,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <span className="hidden sm:inline">{translatePortal(language, 'refreshBtn')}</span>
             </button>
 
             <button
@@ -522,7 +562,9 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
               className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <KeyRound className="h-3.5 w-3.5 text-[#034EA2] dark:text-sky-400" />
-              <span className="hidden xl:inline">Password</span>
+              <span className="hidden xl:inline">
+                {translatePortal(language, 'passwordShortBtn')}
+              </span>
             </button>
 
             <button
@@ -531,7 +573,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
               className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-red-50 hover:text-red-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Sign Out</span>
+              <span className="hidden md:inline">{translatePortal(language, 'signOutBtn')}</span>
             </button>
           </div>
         </header>
@@ -540,22 +582,20 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
           <div className="mx-auto max-w-[1320px] space-y-4">
             {initialWorkspace.mustChangePassword && (
               <div className="no-print flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
-                <span>
-                  You are signed in with the default PIN <strong className="font-mono">0000</strong>. Change your personal password to protect your office access.
-                </span>
+                <span>{translatePortal(language, 'defaultPinOfficeBanner')}</span>
                 <button
                   type="button"
                   onClick={onOpenChangePassword}
                   className="shrink-0 rounded-lg bg-[#0B2C5D] px-3 py-1.5 text-xs font-semibold text-white"
                 >
-                  Change Password
+                  {translatePortal(language, 'changePasswordBtn')}
                 </button>
               </div>
             )}
 
             {activeView === 'overview' && (
               <AdaOverviewView
-                settings={settings}
+                settings={activeSettings}
                 members={members}
                 payments={payments}
                 expenses={expenses}
@@ -571,7 +611,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'members' && (
               <AdaMembersView
-                settings={settings}
+                settings={activeSettings}
                 members={members}
                 payments={payments}
                 penalties={penalties}
@@ -585,7 +625,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'fleet' && (
               <AdaFleetInsuranceView
-                settings={settings}
+                settings={activeSettings}
                 members={members}
                 payments={payments}
                 onUpdateMemberCompliance={handleUpdateMemberCompliance}
@@ -594,7 +634,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'trips' && (
               <AdaTripsView
-                settings={settings}
+                settings={activeSettings}
                 trips={trips}
                 members={members}
                 onSaveTrip={handleSaveTrip}
@@ -604,7 +644,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'incidents' && (
               <AdaIncidentsView
-                settings={settings}
+                settings={activeSettings}
                 incidents={incidents}
                 members={members}
                 onSaveIncident={handleSaveIncident}
@@ -614,7 +654,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'mutual-aid' && (
               <AdaMutualAidView
-                settings={settings}
+                settings={activeSettings}
                 payouts={mutualAid}
                 members={members}
                 onSavePayout={handleSaveMutualAid}
@@ -624,7 +664,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'deleted-members' && (
               <AdaDeletedMembersView
-                settings={settings}
+                settings={activeSettings}
                 members={members}
                 onRestoreMember={handleRestoreMember}
               />
@@ -632,7 +672,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'payments' && (
               <AdaPaymentsView
-                settings={settings}
+                settings={activeSettings}
                 payments={payments}
                 members={members}
                 initialFilter={paymentsInitialFilter}
@@ -649,7 +689,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'overdue' && (
               <AdaOverdueView
-                settings={settings}
+                settings={activeSettings}
                 members={members}
                 payments={payments}
                 onCollectOverdue={(memberId, totalDue, daysLate) => {
@@ -668,7 +708,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'penalties' && (
               <AdaPenaltiesView
-                settings={settings}
+                settings={activeSettings}
                 penalties={penalties}
                 members={members}
                 onSavePenalty={handleSavePenalty}
@@ -678,7 +718,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'ledger' && (
               <AdaLedgerView
-                settings={settings}
+                settings={activeSettings}
                 payments={payments}
                 expenses={expenses}
                 members={members}
@@ -688,7 +728,7 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
 
             {activeView === 'reports' && (
               <AdaReportsView
-                settings={settings}
+                settings={activeSettings}
                 members={members}
                 payments={payments}
                 penalties={penalties}
@@ -696,12 +736,17 @@ export const OfficePortalShell: React.FC<OfficePortalShellProps> = ({
               />
             )}
 
-            {activeView === 'how-to-use' && <AdaHowToUseView settings={settings} />}
+            {activeView === 'how-to-use' && <AdaHowToUseView settings={activeSettings} />}
 
             {activeView === 'settings' && (
               <AdaSettingsView
-                settings={settings}
-                onSaveSettings={handleSaveSettings}
+                settings={activeSettings}
+                onSaveSettings={async (next) => {
+                  await handleSaveSettings(next);
+                  if (next.language) {
+                    onLanguageChange(next.language);
+                  }
+                }}
                 onBuildBackup={handleBuildBackup}
                 onRestoreBackup={handleRestoreBackup}
                 onResetDemoData={handleResetDemoData}
